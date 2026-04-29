@@ -1,8 +1,9 @@
 """
-Build the client artifact for the modpack.
+Build modpack artifacts for both Modrinth and CurseForge launchers.
 
 Produces:
-  build/<name>-<version>.mrpack   Modrinth-format client pack
+  build/<name>-<version>.mrpack       Modrinth-format pack (small, URL refs)
+  build/<name>-<version>-curseforge.zip  CurseForge-format pack (jars bundled)
 
 Reads:
   pack.toml                MC + loader version, name, version
@@ -12,14 +13,16 @@ Reads:
   resourcepacks/           optional, bundled into overrides/
   shaderpacks/             optional, bundled into overrides/
 
-The `side` field on each mod is forwarded to Modrinth's env flags so the
-launcher knows what to install on a dedicated client install vs. a player
-hosting via Open-to-LAN. No separate server build is produced.
+CurseForge zip uses the all-overrides format (no CF API key needed): every
+mod jar is bundled directly. Larger artifact but works without per-mod
+CurseForge project IDs and avoids needing a CF API key in CI.
+
+`side` is forwarded to the mrpack's env flags. CurseForge's manifest spec
+has no per-mod side concept, so the CF zip ships every mod and lets the
+client load what it can.
 
 Usage:
   python scripts/build.py [--out build] [--cache .build_cache]
-
-No packwiz install required.
 """
 from __future__ import annotations
 
@@ -191,6 +194,61 @@ def build_mrpack(
             z.write(src, f"overrides/{arcname}")
 
 
+def build_curseforge_zip(
+    out_path: Path,
+    pack: dict,
+    mods: list[Mod],
+    overrides: list[tuple[Path, str]],
+) -> None:
+    """Build a CurseForge-format modpack zip with every jar bundled in
+    overrides/mods/. Empty `files` array — no CF API key needed."""
+    versions = pack["versions"]
+    mc_version = versions["minecraft"]
+    if "neoforge" in versions:
+        loader_id = f"neoforge-{versions['neoforge']}"
+    elif "forge" in versions:
+        loader_id = f"forge-{versions['forge']}"
+    elif "fabric-loader" in versions:
+        loader_id = f"fabric-{versions['fabric-loader']}"
+    elif "quilt-loader" in versions:
+        loader_id = f"quilt-{versions['quilt-loader']}"
+    else:
+        fail("pack.toml has no recognized mod loader (neoforge/forge/fabric/quilt)")
+
+    manifest = {
+        "minecraft": {
+            "version": mc_version,
+            "modLoaders": [{"id": loader_id, "primary": True}],
+        },
+        "manifestType": "minecraftModpack",
+        "manifestVersion": 1,
+        "name": pack.get("name", "modpack"),
+        "version": str(pack.get("version", "0.0.0")),
+        "author": pack.get("author", ""),
+        "files": [],
+        "overrides": "overrides",
+    }
+
+    modlist_rows = "\n".join(
+        f"  <li><a href=\"{m.url}\">{m.filename}</a></li>" if m.url
+        else f"  <li>{m.filename} (bundled local)</li>"
+        for m in mods
+    )
+    modlist_html = f"<ul>\n{modlist_rows}\n</ul>\n"
+
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    with zipfile.ZipFile(out_path, "w", zipfile.ZIP_DEFLATED) as z:
+        z.writestr("manifest.json", json.dumps(manifest, indent=2))
+        z.writestr("modlist.html", modlist_html)
+        # Every mod jar — both downloaded-from-Modrinth and dropped-in-locally —
+        # goes into overrides/mods/ so the CF launcher just extracts them.
+        for m in mods:
+            assert m.local_path is not None, f"{m.filename}: jar not hydrated"
+            z.write(m.local_path, f"overrides/mods/{m.filename}")
+        for src, arcname in overrides:
+            z.write(src, f"overrides/{arcname}")
+
+
 def collect_overrides(root: Path) -> list[tuple[Path, str]]:
     """Tracked override files (configs + optional client packs)."""
     out: list[tuple[Path, str]] = []
@@ -251,6 +309,11 @@ def main() -> None:
     print(f"\nBuilding {mrpack_path.name} ...")
     build_mrpack(mrpack_path, pack, all_mods, overrides)
     print(f"  {mrpack_path.stat().st_size:,} bytes")
+
+    cf_path = out_dir / f"{name_slug}-{version}-curseforge.zip"
+    print(f"\nBuilding {cf_path.name} ...")
+    build_curseforge_zip(cf_path, pack, all_mods, overrides)
+    print(f"  {cf_path.stat().st_size:,} bytes")
 
     print("\nDone.")
 

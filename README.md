@@ -84,13 +84,45 @@ The pack ships a self-contained Python build script — no packwiz install neede
 python scripts/build.py
 ```
 
-Output lands in `build/<name>-<version>.mrpack` — drop it into the
-**Modrinth App** or **Prism Launcher** to install. Downloaded jars are
-cached in `.build_cache/` so re-runs are fast; pass `--clean` to wipe
-`build/` first.
+Outputs land in `build/`:
 
-CI runs the same script on every push and uploads the artifact. Tagging a
-commit with `v*` (e.g. `v0.2.0`) also publishes it as a GitHub release.
+| File                                       | Use with                              |
+|--------------------------------------------|---------------------------------------|
+| `<name>-<version>.mrpack`                  | Modrinth App, Prism Launcher          |
+| `<name>-<version>-curseforge.zip`          | CurseForge App, Overwolf, ATLauncher  |
+
+The CurseForge zip bundles every mod jar directly (no CF API key needed).
+The mrpack stores Modrinth URLs and stays tiny.
+
+Custom local jars in `mods/*.jar` are bundled into both artifacts so they
+ship with friends' installs.
+
+Downloaded jars are cached in `.build_cache/` so re-runs are fast; pass
+`--clean` to wipe `build/` first.
+
+## Publishing a release
+
+CI builds both artifacts on every push to `main` and uploads them as
+30-day workflow artifacts. To publish a public GitHub Release with both
+files attached, use either:
+
+**A. Manual button** — go to the [Actions tab](../../actions/workflows/build.yml),
+click **Run workflow**, leave `release` checked, optionally type a tag name
+(defaults to `v<pack.toml version>`), and hit Run. The release goes up at
+[Releases](../../releases).
+
+**B. Tag a commit:**
+
+```sh
+# Bump version in pack.toml first if needed
+git tag v0.2.0
+git push --tags
+```
+
+The tag push triggers the same release flow automatically.
+
+Either way, the release contains both `.mrpack` and `-curseforge.zip` and
+is marked as the latest release.
 
 ### packwiz-style export (optional)
 
