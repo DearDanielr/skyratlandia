@@ -1,0 +1,7 @@
+# Default owners — required reviewers for any change.
+# Replace with real GitHub usernames before pushing.
+*       @your-github-username
+
+# Tighter ownership for risky areas
+/pack.toml              @your-github-username
+/.github/               @your-github-username

@@ -1,0 +1,7 @@
+hash-format = "sha256"
+
+# Mod and config entries are added here automatically by `packwiz refresh`.
+# Do not edit by hand — use:
+#   packwiz mr install <mod-slug>          # Modrinth
+#   packwiz cf install <mod-slug>          # CurseForge
+#   packwiz refresh                        # rehash everything

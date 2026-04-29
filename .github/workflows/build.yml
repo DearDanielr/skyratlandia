@@ -1,0 +1,64 @@
+name: Build pack
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install packwiz
+        run: |
+          set -euo pipefail
+          curl -sSL -o /tmp/packwiz.tar.gz \
+            https://github.com/packwiz/packwiz/releases/latest/download/packwiz-linux-x86_64.tar.gz
+          mkdir -p "$HOME/.local/bin"
+          tar -xzf /tmp/packwiz.tar.gz -C "$HOME/.local/bin" packwiz
+          chmod +x "$HOME/.local/bin/packwiz"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Verify pack integrity
+        run: |
+          packwiz refresh
+          if ! git diff --exit-code -- index.toml pack.toml mods config; then
+            echo "::error::pack is out of date — run 'packwiz refresh' locally and commit the result."
+            exit 1
+          fi
+
+      - name: Export Modrinth (.mrpack)
+        run: packwiz modrinth export -o build/modpack.mrpack
+
+      - name: Export CurseForge (.zip)
+        run: packwiz curseforge export -o build/modpack-curseforge.zip
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: modpack-${{ github.sha }}
+          path: build/
+          if-no-files-found: error
+          retention-days: 30
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: build
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: build/**/*
+          generate_release_notes: true

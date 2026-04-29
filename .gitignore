@@ -1,0 +1,30 @@
+# Packwiz / build artifacts
+*.mrpack
+*.zip
+.packwizignore.local
+
+# Generated exports
+/build/
+/dist/
+/out/
+
+# Local dev / launcher state — never commit these
+.minecraft/
+saves/
+logs/
+crash-reports/
+options.txt
+servers.dat*
+usercache.json
+usernamecache.json
+realms_persistence.json
+
+# OS / editor cruft
+.DS_Store
+Thumbs.db
+desktop.ini
+*.swp
+*.swo
+.idea/
+.vscode/
+*.iml
