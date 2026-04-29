@@ -86,19 +86,41 @@ python scripts/build.py
 
 Outputs land in `build/`:
 
-| File                                       | Use with                              |
-|--------------------------------------------|---------------------------------------|
-| `<name>-<version>.mrpack`                  | Modrinth App, Prism Launcher          |
-| `<name>-<version>-curseforge.zip`          | CurseForge App, Overwolf, ATLauncher  |
+| File                                       | Use with                                                    |
+|--------------------------------------------|-------------------------------------------------------------|
+| `<name>-<version>.mrpack`                  | Modrinth App, Prism Launcher (mrpack import)                |
+| `<name>-<version>-curseforge.zip`          | CurseForge App, Prism Launcher (CF zip import), ATLauncher  |
+| `<name>-<version>-prism.zip`               | Prism Launcher native import (memory pre-set, recommended)  |
 
-The CurseForge zip bundles every mod jar directly (no CF API key needed).
-The mrpack stores Modrinth URLs and stays tiny.
+The mrpack stores Modrinth URLs and stays tiny (~5 KB). The CurseForge
+zip bundles every mod jar directly with no CF API key needed (~200 MB).
+The Prism zip is the same size, but ships an `instance.cfg` that pre-sets
+memory so users don't have to fiddle with launcher settings.
 
 Custom local jars in `mods/*.jar` are bundled into both artifacts so they
 ship with friends' installs.
 
 Downloaded jars are cached in `.build_cache/` so re-runs are fast; pass
 `--clean` to wipe `build/` first.
+
+## Memory (16 GB recommended)
+
+This pack ships Distant Horizons + Create + Alex's Caves + a worldgen
+stack — comfortable RAM target is **16 GB**.
+
+Pick the artifact whose launcher auto-sets memory on import:
+
+| Artifact + launcher                            | Auto-set on import? | How it works                                                                                          |
+|------------------------------------------------|---------------------|--------------------------------------------------------------------------------------------------------|
+| `-prism.zip` → Prism Launcher                  | **Yes**             | Bundled `instance.cfg` sets `MaxMemAlloc=16384`.                                                       |
+| `-curseforge.zip` → CurseForge App             | **Yes**             | Manifest sets `minecraft.recommendedRam = 16384` MiB.                                                  |
+| `-curseforge.zip` → Prism Launcher             | **Yes**             | Prism honors `recommendedRam` from the CF manifest on import.                                          |
+| `.mrpack` → Modrinth App                       | **No** (manual)     | mrpack v1 has no memory field. After import: Profile Options → Java → Memory → 16384 MB.               |
+| `.mrpack` → Prism Launcher                     | **No** (manual)     | Edit Instance → Settings → Memory → set 16384 MB.                                                      |
+
+The default is `RECOMMENDED_RAM_MIB = 16384` at the top of
+[scripts/build.py](scripts/build.py) — change once, rebuild, and all three
+artifacts pick up the new value.
 
 ## Publishing a release
 

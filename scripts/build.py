@@ -1,9 +1,10 @@
 """
-Build modpack artifacts for both Modrinth and CurseForge launchers.
+Build modpack artifacts for Modrinth, CurseForge, and Prism Launcher.
 
 Produces:
-  build/<name>-<version>.mrpack       Modrinth-format pack (small, URL refs)
-  build/<name>-<version>-curseforge.zip  CurseForge-format pack (jars bundled)
+  build/<name>-<version>.mrpack            Modrinth-format pack (small, URL refs)
+  build/<name>-<version>-curseforge.zip    CurseForge-format pack (jars bundled)
+  build/<name>-<version>-prism.zip         Prism Launcher native pack (jars bundled, memory pre-set)
 
 Reads:
   pack.toml                MC + loader version, name, version
@@ -39,6 +40,11 @@ from dataclasses import dataclass
 from pathlib import Path
 
 UA = "skyratlandia-modpack-build/0.1"
+
+# Memory hint baked into the CurseForge manifest. CurseForge's launcher and
+# Prism both honor `minecraft.recommendedRam` (MiB). Modrinth has no
+# equivalent field — Modrinth App users set memory in the app UI.
+RECOMMENDED_RAM_MIB = 16384  # 16 GiB
 
 
 @dataclass
@@ -219,6 +225,7 @@ def build_curseforge_zip(
         "minecraft": {
             "version": mc_version,
             "modLoaders": [{"id": loader_id, "primary": True}],
+            "recommendedRam": RECOMMENDED_RAM_MIB,
         },
         "manifestType": "minecraftModpack",
         "manifestVersion": 1,
@@ -247,6 +254,58 @@ def build_curseforge_zip(
             z.write(m.local_path, f"overrides/mods/{m.filename}")
         for src, arcname in overrides:
             z.write(src, f"overrides/{arcname}")
+
+
+def build_prism_zip(
+    out_path: Path,
+    pack: dict,
+    mods: list[Mod],
+    overrides: list[tuple[Path, str]],
+) -> None:
+    """Build a Prism Launcher native instance zip with memory pre-set
+    via instance.cfg. Files at zip root, jars in .minecraft/mods/."""
+    versions = pack["versions"]
+    mc_version = versions["minecraft"]
+    name = pack.get("name", "modpack")
+
+    # Prism component UIDs per loader. Only one is set per pack.
+    components = [
+        {"important": True, "uid": "net.minecraft", "version": mc_version},
+    ]
+    if "neoforge" in versions:
+        components.append({"uid": "net.neoforged", "version": versions["neoforge"]})
+    elif "forge" in versions:
+        components.append({"uid": "net.minecraftforge", "version": versions["forge"]})
+    elif "fabric-loader" in versions:
+        components.append({"uid": "net.fabricmc.fabric-loader", "version": versions["fabric-loader"]})
+    elif "quilt-loader" in versions:
+        components.append({"uid": "org.quiltmc.quilt-loader", "version": versions["quilt-loader"]})
+    else:
+        fail("pack.toml has no recognized mod loader")
+
+    mmc_pack = {"components": components, "formatVersion": 1}
+
+    # instance.cfg uses INI format with no [section] header for default values.
+    # OverrideMemory + MaxMemAlloc make Prism use this instance's memory
+    # instead of the global launcher setting.
+    instance_cfg = (
+        "InstanceType=OneSix\n"
+        f"name={name}\n"
+        "OverrideMemory=true\n"
+        f"MaxMemAlloc={RECOMMENDED_RAM_MIB}\n"
+        "MinMemAlloc=512\n"
+        "PermGen=256\n"
+    )
+
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    with zipfile.ZipFile(out_path, "w", zipfile.ZIP_DEFLATED) as z:
+        z.writestr("instance.cfg", instance_cfg)
+        z.writestr("mmc-pack.json", json.dumps(mmc_pack, indent=2))
+        for m in mods:
+            assert m.local_path is not None, f"{m.filename}: jar not hydrated"
+            z.write(m.local_path, f".minecraft/mods/{m.filename}")
+        for src, arcname in overrides:
+            z.write(src, f".minecraft/{arcname}")
 
 
 def collect_overrides(root: Path) -> list[tuple[Path, str]]:
@@ -314,6 +373,11 @@ def main() -> None:
     print(f"\nBuilding {cf_path.name} ...")
     build_curseforge_zip(cf_path, pack, all_mods, overrides)
     print(f"  {cf_path.stat().st_size:,} bytes")
+
+    prism_path = out_dir / f"{name_slug}-{version}-prism.zip"
+    print(f"\nBuilding {prism_path.name} ...")
+    build_prism_zip(prism_path, pack, all_mods, overrides)
+    print(f"  {prism_path.stat().st_size:,} bytes")
 
     print("\nDone.")
 
