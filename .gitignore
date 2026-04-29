@@ -8,6 +8,9 @@
 /dist/
 /out/
 
+# Build script jar download cache (regenerable, ~200MB+)
+/.build_cache/
+
 # Local dev / launcher state — never commit these
 .minecraft/
 saves/

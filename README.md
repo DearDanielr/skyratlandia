@@ -15,7 +15,8 @@ A collaborative Minecraft modpack managed with [packwiz](https://packwiz.infra.l
 ├── config/              # Mod config files — commit these, this is your customization
 ├── resourcepacks/       # Optional resource packs
 ├── shaderpacks/         # Optional shader packs
-└── .github/workflows/   # CI that builds .mrpack + CurseForge zip on every push
+├── scripts/build.py     # Builds client (.mrpack) + server (.zip) artifacts
+└── .github/workflows/   # CI that runs scripts/build.py on every push
 ```
 
 Mod jars are **not** committed. Each `mods/*.pw.toml` is a tiny manifest pointing at a Modrinth/CurseForge ID + hash, so the repo stays small.
@@ -75,17 +76,48 @@ Commit the changed config and the updated `index.toml`.
 5. A maintainer reviews and merges
 6. CI builds a fresh `.mrpack` + CurseForge zip and attaches them to the run
 
+## Client vs server mods
+
+Each `mods/<slug>.pw.toml` has a `side` field that controls which build the
+mod ships in:
+
+| `side` value | Goes in client build | Goes in server build | Typical use                                    |
+|--------------|----------------------|----------------------|------------------------------------------------|
+| `both`       | yes                  | yes                  | most gameplay mods (Create, JEI, Jade, …)      |
+| `client`     | yes                  | no                   | client-only render libs (Iceberg, Athena, shaders) |
+| `server`     | no                   | yes                  | server-side worldgen / structure mods          |
+
+`side` is auto-set from the mod's Modrinth metadata when you install it.
+To override, just edit the `side =` line in the `.pw.toml` file and rebuild.
+
 ## Building locally
 
-```sh
-# Modrinth-format pack
-packwiz modrinth export
+The pack ships a self-contained Python build script — no packwiz install needed:
 
-# CurseForge-format pack
-packwiz curseforge export
+```sh
+python scripts/build.py
 ```
 
-Both produce a file you can drop into the matching launcher.
+This produces, in `build/`:
+
+- `<name>-<version>.mrpack` — drop into the **Modrinth App** or **Prism Launcher** for a client install. Contains every `side ∈ {both, client}` mod plus configs as overrides.
+- `<name>-<version>-server.zip` — unzip on a server box. Contains every `side ∈ {both, server}` mod, configs, and `start.sh` / `start.bat` wrappers. See the bundled `README.md` inside the zip for NeoForge installer steps.
+
+Downloaded jars are cached in `.build_cache/` so re-runs are fast. Pass
+`--clean` to wipe `build/` first.
+
+CI runs the same script on every push and uploads both artifacts. Tagging a
+commit with `v*` (e.g. `v0.2.0`) also publishes them as a GitHub release.
+
+### packwiz-style export (optional)
+
+If you want the canonical packwiz exports for distribution to packwiz-aware
+launchers, install packwiz (`go install github.com/packwiz/packwiz@latest`) and:
+
+```sh
+packwiz modrinth export      # produces a .mrpack via packwiz's own logic
+packwiz curseforge export    # CurseForge zip
+```
 
 ## Versioning
 

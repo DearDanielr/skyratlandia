@@ -13,29 +13,24 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install packwiz
-        run: |
-          set -euo pipefail
-          curl -sSL -o /tmp/packwiz.tar.gz \
-            https://github.com/packwiz/packwiz/releases/latest/download/packwiz-linux-x86_64.tar.gz
-          mkdir -p "$HOME/.local/bin"
-          tar -xzf /tmp/packwiz.tar.gz -C "$HOME/.local/bin" packwiz
-          chmod +x "$HOME/.local/bin/packwiz"
-          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
 
-      - name: Verify pack integrity
-        run: |
-          packwiz refresh
-          if ! git diff --exit-code -- index.toml pack.toml mods config; then
-            echo "::error::pack is out of date — run 'packwiz refresh' locally and commit the result."
-            exit 1
-          fi
+      - name: Cache downloaded jars
+        uses: actions/cache@v4
+        with:
+          path: .build_cache
+          key: build-cache-${{ hashFiles('mods/*.pw.toml') }}
+          restore-keys: |
+            build-cache-
 
-      - name: Export Modrinth (.mrpack)
-        run: packwiz modrinth export -o build/modpack.mrpack
+      - name: Build client (.mrpack) + server (.zip)
+        run: python scripts/build.py --clean
 
-      - name: Export CurseForge (.zip)
-        run: packwiz curseforge export -o build/modpack-curseforge.zip
+      - name: List artifacts
+        run: ls -lh build/
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
