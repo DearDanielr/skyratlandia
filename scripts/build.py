@@ -1,22 +1,20 @@
 """
-Build client and server artifacts for the modpack.
+Build the client artifact for the modpack.
 
 Produces:
-  build/<name>-<version>.mrpack       client artifact (Modrinth format)
-  build/<name>-<version>-server.zip   server artifact (jars + configs + start scripts)
+  build/<name>-<version>.mrpack   Modrinth-format client pack
 
 Reads:
   pack.toml                MC + loader version, name, version
   mods/*.pw.toml           Modrinth-tracked mods (one file per mod)
-  mods/*.jar               local mods (bundled directly into both artifacts)
-  config/                  mod config files (bundled into both)
-  resourcepacks/           optional, client-side bundle
-  shaderpacks/             optional, client-side bundle
+  mods/*.jar               local mods (bundled into overrides/mods/)
+  config/                  mod config files (bundled into overrides/)
+  resourcepacks/           optional, bundled into overrides/
+  shaderpacks/             optional, bundled into overrides/
 
-`side` field in each .pw.toml controls which artifact a mod ships in:
-  side = "both"    -> client + server
-  side = "client"  -> client only
-  side = "server"  -> server only
+The `side` field on each mod is forwarded to Modrinth's env flags so the
+launcher knows what to install on a dedicated client install vs. a player
+hosting via Open-to-LAN. No separate server build is produced.
 
 Usage:
   python scripts/build.py [--out build] [--cache .build_cache]
@@ -193,76 +191,6 @@ def build_mrpack(
             z.write(src, f"overrides/{arcname}")
 
 
-def build_server_zip(
-    out_path: Path,
-    pack: dict,
-    mods: list[Mod],
-    overrides: list[tuple[Path, str]],
-) -> None:
-    """Build a server zip: mods/, config/, start scripts, README."""
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    mc = pack["versions"]["minecraft"]
-    nf = pack["versions"].get("neoforge", "")
-    name = pack.get("name", "modpack")
-
-    start_sh = (
-        "#!/usr/bin/env bash\n"
-        "set -e\n"
-        "cd \"$(dirname \"$0\")\"\n"
-        f"# NeoForge server jar name pattern: neoforge-{nf}-server.jar (or run/run.sh after install)\n"
-        "if [ -f run.sh ]; then\n"
-        "  exec ./run.sh \"$@\"\n"
-        "fi\n"
-        "echo 'NeoForge server not installed. Run the NeoForge installer first:'\n"
-        f"echo '  java -jar neoforge-{nf}-installer.jar --installServer'\n"
-        "echo 'Then re-run this script.'\n"
-        "exit 1\n"
-    )
-    start_bat = (
-        "@echo off\r\n"
-        "cd /d %~dp0\r\n"
-        "if exist run.bat (\r\n"
-        "  call run.bat %*\r\n"
-        "  exit /b\r\n"
-        ")\r\n"
-        "echo NeoForge server not installed. Run the installer first:\r\n"
-        f"echo   java -jar neoforge-{nf}-installer.jar --installServer\r\n"
-        "echo Then re-run this script.\r\n"
-        "pause\r\n"
-        "exit /b 1\r\n"
-    )
-    readme = (
-        f"# {name} - Server\n\n"
-        f"Minecraft: {mc}\n"
-        f"NeoForge:  {nf}\n\n"
-        "## Setup\n\n"
-        "1. Install Java 21 (NeoForge 1.21.x requires JDK 21).\n"
-        f"2. Download the NeoForge installer from https://projects.neoforged.net/neoforged/neoforge\n"
-        f"   (pick version {nf}) and run:\n"
-        f"     java -jar neoforge-{nf}-installer.jar --installServer\n"
-        "3. Accept the EULA: open `eula.txt` and set `eula=true`.\n"
-        "4. Start the server: `./start.sh` (Linux/Mac) or `start.bat` (Windows).\n\n"
-        "## Files in this zip\n\n"
-        "- `mods/`     server-side mods (already downloaded)\n"
-        "- `config/`   mod configs\n"
-        "- `start.sh`, `start.bat`  launcher wrappers around the NeoForge `run` script\n\n"
-        "Mods marked client-only in the pack are excluded from this zip on purpose.\n"
-    )
-
-    server_mods = [m for m in mods if m.side in ("both", "server")]
-    with zipfile.ZipFile(out_path, "w", zipfile.ZIP_DEFLATED) as z:
-        for m in server_mods:
-            assert m.local_path is not None
-            z.write(m.local_path, f"mods/{m.filename}")
-        for src, arcname in overrides:
-            # Only ship config/ — resourcepacks/shaderpacks are client-only.
-            if arcname.startswith("config/"):
-                z.write(src, arcname)
-        z.writestr("start.sh", start_sh)
-        z.writestr("start.bat", start_bat)
-        z.writestr("README.md", readme)
-
-
 def collect_overrides(root: Path) -> list[tuple[Path, str]]:
     """Tracked override files (configs + optional client packs)."""
     out: list[tuple[Path, str]] = []
@@ -320,15 +248,9 @@ def main() -> None:
     all_mods = remote_mods + local_mods
 
     mrpack_path = out_dir / f"{name_slug}-{version}.mrpack"
-    server_path = out_dir / f"{name_slug}-{version}-server.zip"
-
     print(f"\nBuilding {mrpack_path.name} ...")
     build_mrpack(mrpack_path, pack, all_mods, overrides)
     print(f"  {mrpack_path.stat().st_size:,} bytes")
-
-    print(f"\nBuilding {server_path.name} ...")
-    build_server_zip(server_path, pack, all_mods, overrides)
-    print(f"  {server_path.stat().st_size:,} bytes")
 
     print("\nDone.")
 

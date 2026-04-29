@@ -76,20 +76,6 @@ Commit the changed config and the updated `index.toml`.
 5. A maintainer reviews and merges
 6. CI builds a fresh `.mrpack` + CurseForge zip and attaches them to the run
 
-## Client vs server mods
-
-Each `mods/<slug>.pw.toml` has a `side` field that controls which build the
-mod ships in:
-
-| `side` value | Goes in client build | Goes in server build | Typical use                                    |
-|--------------|----------------------|----------------------|------------------------------------------------|
-| `both`       | yes                  | yes                  | most gameplay mods (Create, JEI, Jade, …)      |
-| `client`     | yes                  | no                   | client-only render libs (Iceberg, Athena, shaders) |
-| `server`     | no                   | yes                  | server-side worldgen / structure mods          |
-
-`side` is auto-set from the mod's Modrinth metadata when you install it.
-To override, just edit the `side =` line in the `.pw.toml` file and rebuild.
-
 ## Building locally
 
 The pack ships a self-contained Python build script — no packwiz install needed:
@@ -98,16 +84,13 @@ The pack ships a self-contained Python build script — no packwiz install neede
 python scripts/build.py
 ```
 
-This produces, in `build/`:
+Output lands in `build/<name>-<version>.mrpack` — drop it into the
+**Modrinth App** or **Prism Launcher** to install. Downloaded jars are
+cached in `.build_cache/` so re-runs are fast; pass `--clean` to wipe
+`build/` first.
 
-- `<name>-<version>.mrpack` — drop into the **Modrinth App** or **Prism Launcher** for a client install. Contains every `side ∈ {both, client}` mod plus configs as overrides.
-- `<name>-<version>-server.zip` — unzip on a server box. Contains every `side ∈ {both, server}` mod, configs, and `start.sh` / `start.bat` wrappers. See the bundled `README.md` inside the zip for NeoForge installer steps.
-
-Downloaded jars are cached in `.build_cache/` so re-runs are fast. Pass
-`--clean` to wipe `build/` first.
-
-CI runs the same script on every push and uploads both artifacts. Tagging a
-commit with `v*` (e.g. `v0.2.0`) also publishes them as a GitHub release.
+CI runs the same script on every push and uploads the artifact. Tagging a
+commit with `v*` (e.g. `v0.2.0`) also publishes it as a GitHub release.
 
 ### packwiz-style export (optional)
 
