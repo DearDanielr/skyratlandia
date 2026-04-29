@@ -1,5 +1,4 @@
-# My Modpack
-
+# Sky Ratlandia
 A collaborative Minecraft modpack managed with [packwiz](https://packwiz.infra.link/).
 
 - **Minecraft:** 1.21.1
