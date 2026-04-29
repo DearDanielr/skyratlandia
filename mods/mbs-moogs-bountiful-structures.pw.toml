@@ -1,0 +1,13 @@
+name = "MBS - Moog's Bountiful Structures"
+filename = "MoogsBountifulStructures-1.21-1.0.3.jar"
+side = "server"
+
+[download]
+url = "https://cdn.modrinth.com/data/Qnb1HbfK/versions/YM0FuLsd/MoogsBountifulStructures-1.21-1.0.3.jar"
+hash-format = "sha512"
+hash = "4075b82d45fb565abb633c1f939ab818f31e84cfdf51d82ce4036858a30b2ffc81ca62c416e62acf550b1e1dbcdcdba68fa96729aa2ce11b606b8b0be804f234"
+
+[update]
+[update.modrinth]
+mod-id = "Qnb1HbfK"
+version = "YM0FuLsd"

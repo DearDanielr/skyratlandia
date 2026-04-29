@@ -1,0 +1,22 @@
+# packwiz hashes content as-is, so all tracked text must keep LF on every
+# platform. Without this, autocrlf on Windows would inflate them to CRLF
+# and `packwiz refresh` would always show diffs.
+* text=auto eol=lf
+*.toml text eol=lf
+*.json text eol=lf
+*.json5 text eol=lf
+*.md text eol=lf
+*.cfg text eol=lf
+*.properties text eol=lf
+*.snbt text eol=lf
+*.mcmeta text eol=lf
+
+# Binary — never normalize
+*.jar binary
+*.zip binary
+*.mrpack binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.ogg binary
+*.wav binary
